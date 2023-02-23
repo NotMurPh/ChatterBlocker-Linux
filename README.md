@@ -42,7 +42,7 @@ and lastly you need to install `xorg-xinput`  if you haven't already for the aut
 
 you can also do it manually either by using `xorg-xinput` ( you just need to disable your main device ) or by adding virtual device file path to `xorg` config files which then you have to make sure that this program runs before `xorg`
 
-***Note! you may need to reassign you hotkeys after changing to new keyboard device***
+***Note! you may need to reassign your hotkeys after changing to new keyboard device***
 
 ### Enjoy your chatterless device 🙃
 
