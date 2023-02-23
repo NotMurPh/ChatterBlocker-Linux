@@ -21,7 +21,9 @@ Just download latest release binary from the release section of the github page 
 ```
 git clone https://github.com/NotMurPh/ChatterBlocker-Linux.git
 cd ChatterBlocker-Linux
-# you need to install libevdev on your system for a successfull compile
+# you need to install libevdev on your system for a successfull compile 
+# and if you are on arch you need to make a symlink like this
+# sudo ln -sf /usr/include/libevdev-1.0/libevdev /usr/include/libevdev
 gcc -lstdc++ -levdev ChatterBlocker.cpp -o ChatterBlocker
 ```
 then you can launch the program using a command like this but first read the requirements down blow 🫠
@@ -47,3 +49,9 @@ you can also do it manually either by using `xorg-xinput` ( you just need to dis
 ### Enjoy your chatterless device 🙃
 
 fell free to contact me if you had any problem or an idea for an improvement
+
+### Credits
+
+This program is sponsored by ChatGPT 🌸
+
+Thanks to @arian8j2 for nothing 😆

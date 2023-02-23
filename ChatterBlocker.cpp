@@ -16,9 +16,9 @@ std::stringstream xinput_device_id; // Reperesents id of device in xorg-xinput
 int GetElapsedTime( struct timeval keydown_time ) {
 	struct timeval current_time; // Reperesents current time in nanoseconds
 	gettimeofday( &current_time , nullptr );
-    long seconds  = current_time.tv_sec  - keydown_time.tv_sec;
-    long useconds = current_time.tv_usec - keydown_time.tv_usec;
-    long elapesd_ms = ( (seconds) * 1000 + useconds / 1000.0 ) + 0.5;
+	long seconds  = current_time.tv_sec  - keydown_time.tv_sec;
+	long useconds = current_time.tv_usec - keydown_time.tv_usec;
+	long elapesd_ms = ( (seconds) * 1000 + useconds / 1000.0 ) + 0.5;
 	return elapesd_ms;
 }
 
@@ -72,11 +72,11 @@ int main( int argc , char *argv[] ) {
 
 	// Open the device file in read only
 	fd = open( argv[1] , O_RDONLY );
-    if ( fd < 0 ) {
-        printf("Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
+	if ( fd < 0 ) {
+		printf("Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
 		printf("Example usage : sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 80ms\n");
         return 1;
-    }
+	}
 
 	// Create a libevdev device from the file descriptor
 	err = libevdev_new_from_fd( fd , &dev );
