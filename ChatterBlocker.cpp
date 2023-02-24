@@ -136,6 +136,14 @@ int main( int argc , char *argv[] ) {
 					// Check for chatters
 					case 1:
 
+						// Dont block chatters if its the first keypress for that key
+						if ( keydowns_time.find(ev.code) == keydowns_time.end() ) {
+							keydowns_time[ev.code] = ev.time;
+							libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
+							continue;
+						}
+
+						// Block chatters
 						if ( GetElapsedTime(keydowns_time[ev.code]) < chatter_threshold ) {
 							printf( "Prevented %s from chattering" , libevdev_event_code_get_name( ev.type , ev.code ) );
 							printf(" , chattered after %dms\n" , GetElapsedTime(keydowns_time[ev.code]) );
