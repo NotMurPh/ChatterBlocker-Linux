@@ -1,24 +1,19 @@
-#include "libevdev-1.0/libevdev/libevdev-uinput.h" /* For managing devices */
+#include <libevdev-1.0/libevdev/libevdev-uinput.h> /* For managing devices */
 #include <fcntl.h> /* For managing files */
 #include <csignal> /* For handeling signals */
-#include <unordered_map> /* For storing key press times */
-#include <cstring> /* For strlen function which gives a string lenght */
-#include <fstream> /* For file stream operations */
-#include <sstream> /* For string stream operations */
+#include <unordered_map> /* For storing each key press info */
+#include <sstream> /* For printf ( format strings ) */
 
 // Public variables
 int fd; // Reperesents file descriptor of device file
 struct libevdev *dev; // Reperesents a libevdev device
 struct libevdev_uinput *uidev; // Reperesents a libevdev uinput device
-std::stringstream xinput_device_id; // Reperesents id of device in xorg-xinput
 
-// Getting elapesd time after last keydown
-int GetElapsedTime( struct timeval keydown_time ) {
-	struct timeval current_time; // Reperesents current time in nanoseconds
-	gettimeofday( &current_time , nullptr );
-	long seconds  = current_time.tv_sec  - keydown_time.tv_sec;
-	long useconds = current_time.tv_usec - keydown_time.tv_usec;
-	long elapesd_ms = ( (seconds) * 1000 + useconds / 1000.0 ) + 0.5;
+// Getting elapesd time from old_time until new_time
+int GetElapsedTime( struct timeval old_time , struct timeval new_time ) {
+	long seconds  = new_time.tv_sec  - old_time.tv_sec;
+	long useconds = new_time.tv_usec - old_time.tv_usec;
+	long elapesd_ms = ( ( seconds * 1000 ) + ( useconds / 1000 ) );
 	return elapesd_ms;
 }
 
@@ -27,8 +22,7 @@ void CleanUp( int signum ) {
 
 	printf("\nCleaning up!\n");
 
-	if ( strlen(xinput_device_id.str().c_str()) > 0 )
-		std::system(("xinput enable " + xinput_device_id.str() ).c_str());
+	libevdev_grab( dev , LIBEVDEV_UNGRAB );
 	if (uidev)
 		libevdev_uinput_destroy(uidev);
 	if (dev)
@@ -44,7 +38,7 @@ void CleanUp( int signum ) {
 // Entry
 int main( int argc , char *argv[] ) {
 
-	// Making sure to clean up before exit
+	// Making sure to clean up before exits
 	std::signal( SIGINT , CleanUp );
 	std::signal( SIGTERM , CleanUp );
 	std::signal( SIGHUP , CleanUp );
@@ -66,13 +60,13 @@ int main( int argc , char *argv[] ) {
 	// Private variables
 	int err; // Reperesents error numbers
 	struct input_event ev; // Reperesents dev events
-	std::unordered_map<int,struct timeval> keydowns_time; // Reperesents key name & time of dev key down events
+	std::unordered_map<int,struct timeval> last_keyup_times; // Reperesents key name & time of dev key up events
 	std::unordered_map<int,bool> keys_held; // Reperesents key name & key being held or not
-	int chatter_threshold = std::stoi(argv[2]); // Reperesents the delay in which you cant type (counts as a chatter)
+	int chatter_threshold = std::stoi(argv[2]); // Reperesents the delay after a keyup event in which you cant type
 
 	// Open the device file in read only
 	fd = open( argv[1] , O_RDONLY );
-	if ( fd < 0 ) {
+	if (!fd) {
 		printf("Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
 		printf("Example usage : sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 80ms\n");
         return 1;
@@ -80,97 +74,90 @@ int main( int argc , char *argv[] ) {
 
 	// Create a libevdev device from the file descriptor
 	err = libevdev_new_from_fd( fd , &dev );
-	if ( err < 0 ) {
+	if (err) {
 		printf("Failed to create a new libevdev device!\n");
 		return 1;
 	}
 
-	// Check if the device has keys
-	if ( !libevdev_has_event_type( dev , EV_KEY ) ) {
+	// Check to see if the device has keys
+	if (!libevdev_has_event_type( dev , EV_KEY )) {
 		printf("The given device does not have any keys!\n");
 		return 1;
 	}
 
+	// Check to see if the device is a valid keyboard
+	if (!libevdev_has_event_code( dev , EV_KEY , KEY_A )) {
 		printf("The give device isn't a valid keyboard proceeding anyway!\n");
+	}
 
 	// Create a libevdev uinput device from a libevdev device ( this also creates a device file like /dev/event19 which we should read from )
 	err = libevdev_uinput_create_from_device( dev , LIBEVDEV_UINPUT_OPEN_MANAGED , &uidev );
-	if ( err < 0 ) {
+	if (err) {
 		printf("Failed to create a new virtual device!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
 		return 1;
 	}
 
-	// Show monitoring device for chatters message
+	// Show monitoring device for chatters message and some hints
 	printf( "Monitoring <%s> for chatters and writing to <%s> :)\n\n" , libevdev_get_name(dev) , libevdev_uinput_get_devnode(uidev) );
 	printf("If you dont see anything happening maybe you choose the wrong device!\n");
-	printf("for example /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-if01-event-kbd doesn't work for me instead i have to use ");
-	printf("either /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd or usually /dev/input/event5 keep in mind that these event numbers change alot");
-	printf("so its best to use /dev/input/by-id as a source.\n");
+	printf("Check out https://github.com/NotMurPh/ChatterBlocker-Linux#how-do-i-install-and-use- to learn more.\n");
 
-	// Getting xinput_device_id using terminal commands and a file
-	std::system(( "xinput list --id-only '" + std::string(libevdev_get_name(dev)) + "' > xinput_device_id_chatterblocker" ).c_str());
-	xinput_device_id << std::ifstream("xinput_device_id_chatterblocker").rdbuf();
-	std::system("rm xinput_device_id_chatterblocker");
-
-	// Changing to new chatter less device using xorg-xinput
-	err = std::system(( "xinput disable " + xinput_device_id.str() ).c_str());
-	if ( err == 32512 )
-		printf("xorg-xinput Is not installed! , if you are using xorg and you want to change to the virtual(chatterless) device automatically install xorg-xinput\n");
-	else if ( err != 0 )
-		printf("Failed to use the chatterless device , check out the source code\n");
-	if ( err != 0 )
-		printf("You can proceed manually by using %s as your input device\n" , libevdev_uinput_get_devnode(uidev) );
+	// Grab the device if already not grabbed so only this program can use the device file and thus makes the xorg use the virtual device
+	libevdev_next_event( dev , LIBEVDEV_READ_FLAG_BLOCKING , &ev );
+	err = libevdev_grab( dev , LIBEVDEV_GRAB );
+	if (err)
+		printf("Faild to use the virtual device! , you can proceed manually by disabling your main device using xinput or by using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
 	else
-		printf( "\nSuccessfully started using %s as your input device\n" , libevdev_uinput_get_devnode(uidev) );
-
+		printf( "\nSuccessfully started using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
 
 	// Main loop , writes every dev event to uidev except the chatter ones
 	printf("\nChatterLogs : \n");
 	while (true) {
-		if ( libevdev_next_event( dev , LIBEVDEV_READ_FLAG_NORMAL , &ev ) == LIBEVDEV_READ_STATUS_SUCCESS ) {
+		if ( libevdev_next_event( dev , LIBEVDEV_READ_FLAG_BLOCKING , &ev ) == LIBEVDEV_READ_STATUS_SUCCESS ) {
 
-			// If event was a keydown event
+			// If event was a key event
 			if ( ev.type == EV_KEY ) {
 				switch (ev.value) {
 
-					// Check for chatters
+					// On key down
 					case 1:
 
-						// Dont block chatters if its the first keypress for that key
-						if ( keydowns_time.find(ev.code) == keydowns_time.end() ) {
-							keydowns_time[ev.code] = ev.time;
-							libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
-							continue;
-						}
-
 						// Block chatters
-						if ( GetElapsedTime(keydowns_time[ev.code]) < chatter_threshold ) {
+						if ( GetElapsedTime( last_keyup_times[ev.code] , ev.time ) < chatter_threshold ) {
+
+							// Dont block chatters if its the first keypress for that key
+							if ( last_keyup_times[ev.code].tv_sec == 0 ) {
+								libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
+								continue;
+							}
+
 							printf( "Prevented %s from chattering" , libevdev_event_code_get_name( ev.type , ev.code ) );
-							printf(" , chattered after %dms\n" , GetElapsedTime(keydowns_time[ev.code]) );
-							keydowns_time[ev.code] = ev.time;
+							printf( " , chattered after %dms.\n" , GetElapsedTime( last_keyup_times[ev.code] , ev.time ) );
+							keys_held[ev.code] = true;
 							continue;
 						}
 
-						keydowns_time[ev.code] = ev.time;
+					break;
 
-						break;
-
-					// Unblock keyhold after chatter
+					// On key hold
 					case 2:
 
-						if (!keys_held[ev.code]) {
+						// If the key is held after a chatter make sure to initiate it first
+						if (keys_held[ev.code]) {
 							libevdev_uinput_write_event( uidev , ev.type , ev.code , 1 );
 							libevdev_uinput_write_event( uidev , EV_SYN , SYN_REPORT , 0 );
-							keys_held[ev.code] = true;
+							keys_held[ev.code] = false;
 						}
 
-						break;
+					break;
 
+					// On key up
 					default:
 
 						keys_held[ev.code] = false;
+						last_keyup_times[ev.code] = ev.time;
 
-						break;
+					break;
 
 				}
 			}
