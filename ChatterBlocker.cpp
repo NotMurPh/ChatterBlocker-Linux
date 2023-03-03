@@ -8,6 +8,7 @@
 int fd; // Reperesents file descriptor of device file
 struct libevdev *dev; // Reperesents a libevdev device
 struct libevdev_uinput *uidev; // Reperesents a libevdev uinput device
+bool gamemode = false; // Reperesents status of gamemode
 
 // Getting elapesd time from old_time until new_time
 int GetElapsedTime( struct timeval old_time , struct timeval new_time ) {
@@ -15,6 +16,12 @@ int GetElapsedTime( struct timeval old_time , struct timeval new_time ) {
 	long useconds = new_time.tv_usec - old_time.tv_usec;
 	long elapesd_ms = ( ( seconds * 1000 ) + ( useconds / 1000 ) );
 	return elapesd_ms;
+}
+
+// Toggle gamemode on or off
+void ToggleGameMode ( int signum ) {
+	gamemode = !gamemode;
+	printf("Gamemode : %s\n" , gamemode ? "On" : "Off" );
 }
 
 // Free the memory
@@ -49,6 +56,9 @@ int main( int argc , char *argv[] ) {
 	std::signal( SIGABRT , CleanUp );
 	std::signal( SIGILL , CleanUp );
 	std::signal( SIGFPE , CleanUp );
+
+	// Toggle gamemode on signal SIGUSR1
+	std::signal( SIGUSR1 , ToggleGameMode );
 
 	// Show help message if no arguments were provided
 	if ( argc < 3 ) {
@@ -129,6 +139,14 @@ int main( int argc , char *argv[] ) {
 							if ( last_keyup_times[ev.code].tv_sec == 0 ) {
 								libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
 								continue;
+							}
+
+							// Dont block chatters for W A S D keys if gamemode is enabled 
+							if (gamemode) {
+								if ( ev.code == 17 || ev.code == 30 || ev.code == 31 || ev.code == 32 ) {
+									libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
+									continue;
+								}
 							}
 
 							printf( "Prevented %s from chattering" , libevdev_event_code_get_name( ev.type , ev.code ) );
