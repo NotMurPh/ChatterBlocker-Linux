@@ -63,7 +63,7 @@ int main( int argc , char *argv[] ) {
 	// Show help message if no arguments were provided
 	if ( argc < 3 ) {
 		printf("Hey! :) to use ChatterBlocker you must include the device file and the chatter threshold in milliseconds like this\n");
-		printf("sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 80ms\n");
+		printf("sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 30ms\n");
 		return 1;
 	}
 
@@ -78,7 +78,7 @@ int main( int argc , char *argv[] ) {
 	fd = open( argv[1] , O_RDONLY );
 	if (!fd) {
 		printf("Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
-		printf("Example usage : sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 80ms\n");
+		printf("Example usage : sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 30ms\n");
         return 1;
 	}
 
@@ -110,7 +110,7 @@ int main( int argc , char *argv[] ) {
 	// Show monitoring device for chatters message and some hints
 	printf( "Monitoring <%s> for chatters and writing to <%s> :)\n\n" , libevdev_get_name(dev) , libevdev_uinput_get_devnode(uidev) );
 	printf("If you dont see anything happening maybe you choose the wrong device!\n");
-	printf("Check out https://github.com/NotMurPh/ChatterBlocker-Linux#how-do-i-install-and-use- to learn more.\n");
+	printf("Check out https://github.com/NotMurPh/ChatterBlocker-Linux#how-do-i-install-and-use- to learn more.\n\n");
 
 	// Grab the device if already not grabbed so only this program can use the device file and thus makes the xorg use the virtual device
 	libevdev_next_event( dev , LIBEVDEV_READ_FLAG_BLOCKING , &ev );
@@ -118,7 +118,7 @@ int main( int argc , char *argv[] ) {
 	if (err)
 		printf("Faild to use the virtual device! , you can proceed manually by disabling your main device using xinput or by using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
 	else
-		printf( "\nSuccessfully started using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
+		printf( "Successfully started using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
 
 	// Main loop , writes every dev event to uidev except the chatter ones
 	printf("\nChatterLogs : \n");
