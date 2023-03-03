@@ -8,11 +8,19 @@ Well simply put when your stupid keyboard types twice or more after a single key
 
 ### Why another chatter blocker though ?
 
-First of all its written in c++ which means speed go brrrrrrrrrrrrr 💨 , but jokes aside there is only one linux chatter blocker that i found on github which is this one https://github.com/finkrer/KeyboardChatteringFix-Linux which is written in python and i my self tried using it but since im a dum dum and the project wasn't well documented for me to understand how to use it and that it wasn't updated in like 3 years made me think that it was broken and doesn't work hence i started writing my own and in the proccess i learned how i have to use it which i have to say really really pissed me off 😤 but either way i finnished the project with the added bounes offff drum roll plssss.... automating the usage prosses in `xorg` using `xorg-xinput` and removed the need to restart and i have to say that you can use this on other devices too not just a keyboard and it shows logs about blocked chatters and their times
+First of all its written in c++ which means speed go brrrrrrrrrrrrr 💨 , but jokes aside there is only one linux chatter blocker that i found on github  which is this one https://github.com/finkrer/KeyboardChatteringFix-Linux which is written in python and i my self tried using it but since im a dum dum   and the project wasn't well documented for me to understand how to use it and that it wasn't updated in like 3 years made me think that it was broken     and doesn't work hence i started writing my own and in the proccess i learned how i have to use it which i have to say really really pissed me off 😤     but either way i finnished the project with the added bounes offff drum roll plssss....
+
+- Way lighter on resources 🤏🏻
+- Faster 🏃🏼‍♂️
+- Fixing key holds not working after chatters ️🛠️
+- Gamemode ️🕹️
+- Supports any device with keys ⌨️
+- Showing proper logs 💬
+- Better documented 🧾
 
 ### How does it work ?
 
-I use libevdev library to read from your device file e.g `/dev/input/event5` and create a virtual device which replicates your device but filters the chatters in the specified threshold in the proccess after keydown events and then it uses `xorg-xinput` to disable your main device hence `xorg` uses the virtual one if that didn't work or you are on wayland or somthing unknown like that you can also use the newly created `/dev/input/event?` device manually
+I use libevdev library to read from your device file e.g `/dev/input/event5` and create a virtual device which replicates your device but filters the chatters in the specified threshold after keyup events and then it grabs your device so no one else can use it hence `xorg` uses the virtual one instead and if that didn't work or you are on wayland or somthing unknown like that you can also use the newly created `/dev/input/event?` device manually
 
 ### How do i install and use ?
 
@@ -22,33 +30,36 @@ Just download latest release binary from the release section of the github page 
 git clone https://github.com/NotMurPh/ChatterBlocker-Linux.git
 cd ChatterBlocker-Linux
 # you need to install libevdev on your system for a successfull compile 
-# and if you are on arch you need to make a symlink like this
+# and then you might need to make a symlink like so
 # sudo ln -sf /usr/include/libevdev-1.0/libevdev /usr/include/libevdev
-gcc -lstdc++ -levdev ChatterBlocker.cpp -o ChatterBlocker
+g++ -l evdev ChatterBlocker.cpp -o ChatterBlocker
 ```
-then you can launch the program using a command like this but first read the requirements down blow 🫠
+then you can launch the program using a command like this but first read the instructions down blow 🫠
 
 ```
-./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 80ms
+./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 30ms
 ```
 
-***Attention! you may need to use sudo or give root access for it to work but you can simply try it***
+***Attention! you may need to use sudo or give root access for it to work***
 
 Required arguments in order : 
 - Device file path ( Which you need to find and replace to your own device )
-- Chatter threshold ( The time which you can not repeat a keypress after the last keydown event for that key )
+- Chatter threshold ( The time which you can not repeat a keydown after the last keyup event for that key )
 
-It is recommended to use a device file from `/dev/input/by-id/` as it has consistant names and do not changes after restart also i have to mention that i had two keyboard devices in there which only one of them worked
+It is recommended to use a device file from `/dev/input/by-id/` as it has consistant names and do not changes after each restart 
+and also i have to mention that there might be two different devices with your keyboard name on it but if you pay close attention you will notice that one has `if01` attached to the name of it that one is responsable for handeling media keys 🎶 and handeling multitouch ☝🏻 more than 6 simultaneous keys so that means if you press 8 keys at the same time only the last 2 of those keys will be sent through this device so you basically dont want to use this device for chatter blocking and use the other one instead or run two different instances of the ChatterBlocker for each one unfortunately ChatterBlocker does not support two different devices at the same time 😢
 
-and lastly you need to install `xorg-xinput`  if you haven't already for the automation of switching to virtual device
+you can find your threshold value by first setting threshold to somthing like 100ms and repeat pressing a key a fast as you can then according tho the logs lower the value until it doesn't block your fast keypresses keep in mind that lowering threshold too much may not block all of your chatters for me 30ms is where 99% my chatters are blocked and i cant repeat pressing the key any faster than that
 
-you can also do it manually either by using `xorg-xinput` ( you just need to disable your main device ) or by adding virtual device file path to `xorg` config files which then you have to make sure that this program runs before `xorg`
+If you get `Faild to use the virtual device!` error ❌ or you are still using your own keyboard device with chatters or you cant type/use your keyboard you can start using the virtual chatterless device manually either by using `xorg-xinput` program and disabling your main device so `xorg` starts using the virtual one or by adding the virtual device file path to the `xorg` config files which then you have to make sure that this program runs before `xorg` or basically use `/dev/input/event?` created by program in anyother way!
 
 ***Note! you may need to reassign your hotkeys after changing to new keyboard device***
 
+Also here is a nice website that you can test your keyboard in https://keyboard.dmitrijs.lv/
+
 ### Enjoy your chatterless device 🙃
 
-fell free to contact me if you had any problem or an idea for an improvement
+Fell free to contact me if you had any problem or an idea for an improvement
 
 ### Credits
 
