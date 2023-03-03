@@ -55,7 +55,7 @@ you can find your threshold value by first setting threshold to somthing like 10
 
 If you get `Faild to use the virtual device!` error ❌ or you are still using your own keyboard device with chatters or you cant type/use your keyboard you can start using the virtual chatterless device manually either by using `xorg-xinput` program and disabling your main device so `xorg` starts using the virtual one or by adding the virtual device file path to the `xorg` config files which then you have to make sure that this program runs before `xorg` or basically use `/dev/input/event?` created by program in anyother way!
 
-And to enable/disable the gamemode ️🕹️ whenever you want you just send SIGUSR1 signal to ChatterBlocker like so :
+And to toggle the gamemode ️🕹️ whenever you want you can just send SIGUSR1 signal to ChatterBlocker like so :
 
 ```
 sudo pkill -USR1 ChatterBlocker
