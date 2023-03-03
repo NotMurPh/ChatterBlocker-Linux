@@ -22,6 +22,8 @@ First of all its written in c++ which means speed go brrrrrrrrrrrrr 💨 , but j
 
 I use libevdev library to read from your device file e.g `/dev/input/event5` and create a virtual device which replicates your device but filters the chatters in the specified threshold after keyup events and then it grabs your device so no one else can use it hence `xorg` uses the virtual one instead and if that didn't work or you are on wayland or somthing unknown like that you can also use the newly created `/dev/input/event?` device manually
 
+And for the gamemode ️🕹️ well you just send a SIGUSR1 signal to ChatterBlocker and ChatterBlocker toggles the gamemode to on which then stops the chatter blocking for `W A S D` keys why ? because in games usually these keys are being held , and when for example you press `W` key and it decides to chatters the key down event responsable for starting the hold events gets blocked by ChatterBlocker preventing the game from detecting a key hold and preventing you from moving forward until it is detected as a hold and fixed in ChatterBlocker which this process takes a while and it is huge in games where every thing is fast paced and since i couldn't fix the issue without reproducing the chatter i came up with this alternative way which lets the `W A S D` keys chatter in game which isn't that important and ultimatly the choice is yours 🙂
+
 ### How do i install and use ?
 
 Just download latest release binary from the release section of the github page or clone and compile the project using these commands :
@@ -53,7 +55,14 @@ you can find your threshold value by first setting threshold to somthing like 10
 
 If you get `Faild to use the virtual device!` error ❌ or you are still using your own keyboard device with chatters or you cant type/use your keyboard you can start using the virtual chatterless device manually either by using `xorg-xinput` program and disabling your main device so `xorg` starts using the virtual one or by adding the virtual device file path to the `xorg` config files which then you have to make sure that this program runs before `xorg` or basically use `/dev/input/event?` created by program in anyother way!
 
-***Note! you may need to reassign your hotkeys after changing to new keyboard device***
+And to enable/disable the gamemode ️🕹️ whenever you want you just send SIGUSR1 signal to ChatterBlocker like so :
+
+```
+sudo pkill -USR1 ChatterBlocker
+# Keep in mind that you need to use sudo if you started the ChatterBlocker using sudo
+```
+
+***Note! you may need to reassign your hotkeys after changing to the new device***
 
 Also here is a nice website that you can test your keyboard in https://keyboard.dmitrijs.lv/
 
