@@ -1,106 +1,154 @@
 #include <libevdev-1.0/libevdev/libevdev-uinput.h> /* For managing devices */
 #include <fcntl.h> /* For managing files */
 #include <csignal> /* For handeling signals */
-#include <unordered_map> /* For storing each key press info */
-#include <sstream> /* For printf ( format strings ) */
+#include <thread> /* For chatter waiters ( Threads ) */
+#include <unordered_map> /* For storing each key press info ( Dictionary ) */
+#include <sstream> /* For printf ( Format strings ) */
+#include <vector> /* For storing arguments ( List ) */
+
+using namespace std;
 
 // Public variables
 int fd; // Reperesents file descriptor of device file
-struct libevdev *dev; // Reperesents a libevdev device
-struct libevdev_uinput *uidev; // Reperesents a libevdev uinput device
+libevdev *dev; // Reperesents a libevdev device
+libevdev_uinput *uidev; // Reperesents a libevdev uinput device
 bool gamemode = false; // Reperesents status of gamemode
+bool delaymode = false; // Reperesents status of delaymode
+
+// Shows the help message
+void ShowHelp () {
+
+	printf( "Hey! :) to use ChatterBlocker you must include the device file address and the chatter threshold in milliseconds like this\n" );
+	printf( "sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 30ms\n" );
+	printf( "\nAvalibale optional flags : \n\n --delayed : to enable delaymode right away \n --gamemode : to enable gamemode right away" );
+
+}
 
 // Initializes dev and uidev
-int InitializeDevices( char* argv[] , bool first_time ) {
+int InitializeDevices( char* device_address , bool first_time ) {
 
 	int err; // Reperesents error numbers
 
-	// Wait until the input device file is available
-	printf("Waiting for input device file to be available...\n");
-	if ( first_time ) printf ( "if stuck, maybe you didn't give the correct device file address!\n" );
-	while ( access( argv[1] , F_OK ) == -1 );
-	printf("It's available, opening it\n");
+	// Wait until the device file is available
+	printf( "Waiting for input device file to be available...\n" );
+	while ( access( device_address , F_OK ) == -1 );
 
 	// Open the device file in read only
-	fd = open( argv[1] , O_RDONLY );
-	if (!fd) {
-		printf("Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
+	fd = open( device_address , O_RDONLY );
+	if ( !fd ) {
+
+		printf( "Failed to open input device file!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n" );
         return 1;
+
 	}
 
 	// Create a libevdev device from the file descriptor
 	err = libevdev_new_from_fd( fd , &dev );
-	if (err) {
-		printf("Failed to create a new libevdev device!\n");
+	if ( err ) {
+
+		printf( "Failed to create a new libevdev device!\n" );
 		return 1;
+
 	}
 
 	// Check to see if the device has keys
-	if (!libevdev_has_event_type( dev , EV_KEY )) {
-		printf("The given device does not have any keys!\n");
+	if ( !libevdev_has_event_type( dev , EV_KEY ) ) {
+
+		printf( "The given device does not have any keys!\n" );
 		return 1;
+
 	}
 
 	// Check to see if the device is a valid keyboard
-	if (!libevdev_has_event_code( dev , EV_KEY , KEY_A )) {
-		printf("The given device isn't a valid keyboard proceeding anyway!\n");
-	}
+	if ( !libevdev_has_event_code( dev , EV_KEY , KEY_A ) ) printf( "The given device isn't a valid keyboard proceeding anyway!\n" );
 
 	// Create a libevdev uinput device from a libevdev device ( this also creates a device file like /dev/event19 which we should read from )
 	err = libevdev_uinput_create_from_device( dev , LIBEVDEV_UINPUT_OPEN_MANAGED , &uidev );
-	if (err) {
-		printf("Failed to create a new virtual device!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n");
+	if ( err ) {
+
+		printf( "Failed to create a new virtual device!\nMaybe you forgot to use sudo ? ( psst i need permissions! )\n" );
 		return 1;
+
 	}
 
-	// Show monitoring device for chatters message and some hints
-	if ( first_time ) {
-		printf( "Monitoring <%s> for chatters and writing to <%s> :)\n\n" , libevdev_get_name(dev) , libevdev_uinput_get_devnode(uidev) );
-		printf("If you dont see anything happening maybe you choose the wrong device!\n");
-		printf("Check out https://github.com/NotMurPh/ChatterBlocker-Linux#how-do-i-install-and-use- to learn more.\n\n");
-	}
+	// Show the devices and wait a bit to partialy fix a bug
+	if ( first_time ) { printf( "\nMonitoring <%s> for chatters and writing to <%s> :)\n" , libevdev_get_name( dev ) , libevdev_uinput_get_devnode( uidev ) ); usleep( 100 * 1000 ); }
 
-	// Grab the device so only this program can use the device file and thus makes the xorg use the virtual device
+	// Grab the device so only this program can use it thus making xorg use the virtual device instead
 	err = libevdev_grab( dev , LIBEVDEV_GRAB );
-	if (err)
-		printf("Faild to use the virtual device! , you can proceed manually by disabling your main device using xinput or by using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
+	if ( err )
+		printf( "Faild to use the virtual device! , you can proceed manually by disabling your main device using xinput or by using %s as your input device.\n" , libevdev_uinput_get_devnode( uidev ) );
 	else if ( first_time )
-		printf( "Successfully started using %s as your input device.\n" , libevdev_uinput_get_devnode(uidev) );
+		printf( "Successfully started using %s as your input device.\n" , libevdev_uinput_get_devnode( uidev ) );
 
 	return 0;
 
 }
 
+// Toggles gamemode on and off ( Alowing chatters for W A S D keys )
+void ToggleGameMode ( int signum ) {
+
+	gamemode = !gamemode;
+	printf( "GameMode : %s\n" , gamemode ? "On" : "Off" );
+
+}
+
+// Toggles delay mode on and off
+void ToggleDelayMode ( int signum ) {
+
+	delaymode = !delaymode;
+	printf( "DelayMode : %s\n" , delaymode ? "On" : "Off" );
+
+}
+
+// Holds release events and writes them after making sure its not a chatter
+void WaitForChatter ( input_event event , int chatter_threshold , thread::id &waiter_id , thread::id &chattered_waiter_id ) {
+
+	// Waits for how ever much threshold is 
+	for ( int timer = 1 ; timer <= chatter_threshold ; timer += 1 ) {
+
+		if ( waiter_id == thread::id() ) waiter_id = this_thread::get_id();
+
+		usleep( 1 * 1000 );
+
+	}
+
+	// Specify that this threads work is done
+	waiter_id = thread::id();
+
+	// If there was'nt a chatter while we were waiting and delaymode is on write the release event otherwise reset the chattered_waiter_id
+	if ( chattered_waiter_id != this_thread::get_id() && delaymode ) {
+
+		libevdev_uinput_write_event( uidev , event.type , event.code , event.value );
+		libevdev_uinput_write_event( uidev , EV_SYN , SYN_REPORT , 0 );
+
+	}
+	else chattered_waiter_id = thread::id();
+
+}
+
 // Getting elapesd time from old_time until new_time
-int GetElapsedTime( struct timeval old_time , struct timeval new_time ) {
-	long seconds  = new_time.tv_sec  - old_time.tv_sec;
+int GetElapsedTime( timeval old_time , timeval new_time ) {
+
+	long seconds = new_time.tv_sec  - old_time.tv_sec;
 	long useconds = new_time.tv_usec - old_time.tv_usec;
 	long elapesd_ms = ( ( seconds * 1000 ) + ( useconds / 1000 ) );
+
 	return elapesd_ms;
+
 }
 
-// Toggle gamemode on or off
-void ToggleGameMode ( int signum ) {
-	gamemode = !gamemode;
-	printf("Gamemode : %s\n" , gamemode ? "On" : "Off" );
-}
-
-// Free the memory
+// Free the memory and unlock the device
 void CleanUp( int signum ) {
 
-	printf("\nCleaning up!\n");
+	printf( "\n\nCleaning up!\n" );
 
-	if (uidev)
-		libevdev_uinput_destroy(uidev);
-	if (dev) {
-		libevdev_grab( dev , LIBEVDEV_UNGRAB );
-		libevdev_free(dev);
-	}
-	if (fd)
-		close(fd);
+	if ( uidev ) libevdev_uinput_destroy( uidev );
+	if ( dev ) { libevdev_grab( dev , LIBEVDEV_UNGRAB ); libevdev_free( dev ); }
+	if ( fd ) close( fd );
 
-	printf("Exiting!\n");
-	_exit(0);
+	printf( "Exiting!\n\n" );
+	_exit( 0 );
 
 }
 
@@ -108,51 +156,93 @@ void CleanUp( int signum ) {
 int main( int argc , char* argv[] ) {
 
 	// Making sure to clean up before exits
-	std::signal( SIGINT , CleanUp );
-	std::signal( SIGTERM , CleanUp );
-	std::signal( SIGHUP , CleanUp );
-	std::atexit( [] {CleanUp(0);} );
+	signal( SIGINT , CleanUp );
+	signal( SIGTERM , CleanUp );
+	signal( SIGHUP , CleanUp );
+	atexit( [] {CleanUp(0);} );
 
 	// And crashes
-	std::signal( SIGSEGV , CleanUp );
-	std::signal( SIGABRT , CleanUp );
-	std::signal( SIGILL , CleanUp );
-	std::signal( SIGFPE , CleanUp );
+	signal( SIGSEGV , CleanUp );
+	signal( SIGABRT , CleanUp );
+	signal( SIGILL , CleanUp );
+	signal( SIGFPE , CleanUp );
 
-	// Toggle gamemode on signal SIGUSR1
-	std::signal( SIGUSR1 , ToggleGameMode );
+	// Toggle modes on user signals ( USR1 , USR2 )
+	signal( SIGUSR1 , ToggleGameMode );
+	signal( SIGUSR2 , ToggleDelayMode );
 
-	// Show help message if no arguments were provided
-	if ( argc < 3 ) {
-		printf("Hey! :) to use ChatterBlocker you must include the device file and the chatter threshold in milliseconds like this\n");
-		printf("sudo ./ChatterBlocker /dev/input/by-id/usb-Logitech_G513_Carbon_Tactile_0B5238613437-event-kbd 30ms\n");
-		return 1;
-	}
+	// Print an empty line for spacing purposes
+	printf( "\n" );
+
+	// Show the help message if no arguments are provided
+	if ( argc < 3 ) { ShowHelp(); return 1; }
 
 	// Private variables
-	struct input_event ev; // Reperesents dev events
-	std::unordered_map<int,struct timeval> last_keyup_times; // Reperesents key name & time of dev key up events
-	std::unordered_map<int,bool> keys_held; // Reperesents key name & key being held or not
-	int chatter_threshold = std::stoi(argv[2]); // Reperesents the delay after a keyup event in which you cant type
+	vector<string> flags; // Represents a list of flags ( Arguments starting with -- )
+	vector<char*> arguments; // Represents a list of actual arguments ( Arguments not starting with -- )
 
-	if ( InitializeDevices( argv , true ) ) return 1;
+	// Sort programs raw arguments into two categorys : arguments and flags
+	for ( int i = 1 ; i < argc ; i++ ) {
+
+		string each_arg = argv[ i ];
+
+		if ( each_arg.substr( 0 , 2 ) == "--" ) flags.push_back( argv[ i ] );
+		else arguments.push_back( argv[ i ] );
+
+	}
+
+	// Check if the correct flags are given if any otherwise show help message
+	for ( string each_flag : flags )
+		if ( each_flag != "--gamemode" && each_flag != "--delayed" ) { ShowHelp(); return 1; }
+
+	// Check if the correct amount of arguments are given otherwise show help message
+	if ( arguments.size() != 2 ) { ShowHelp(); return 1; }
+
+	// Private variables
+	input_event ev; // Reperesents dev events
+
+	// Represents properties of each key
+	struct properties {
+
+		timeval last_up_time;
+		thread waiter;
+		thread::id waiter_id = thread::id();
+		thread::id chattered_waiter_id;
+
+	};
+
+	unordered_map< int , properties > keys; // Reperesents a dictionary of keys and their properties
+	int chatter_threshold = stoi( arguments[ 1 ] ); // Reperesents the delay after a keyup event in which you cant type
+
+	// Initialize devices for the first time
+	if ( InitializeDevices( arguments[ 0 ] , true ) ) return 1;
+
+	// Start showing logs
+	printf( "\nLogs : \n" );
+
+	// Read the flags and invoke their jobs
+	for ( string each_flag : flags ) {
+		if ( each_flag == "--gamemode" ) ToggleGameMode( 0 );
+		if ( each_flag == "--delayed" ) ToggleDelayMode( 0 );
+	}
 
 	// Main loop , writes every dev event to uidev except the chatter ones
-	printf("\nChatterLogs : \n");
-	while (true) {
+	while ( true ) {
 
-		if ( libevdev_next_event( dev , LIBEVDEV_READ_FLAG_BLOCKING , &ev ) != LIBEVDEV_READ_STATUS_SUCCESS ) {
+		// Wait for the next event , and if we cant read events try reinitializing the devices
+		if ( libevdev_next_event( dev , LIBEVDEV_READ_FLAG_BLOCKING , &ev ) == -19 ) {
 
+			// Show log
 			printf( "Faild to read the device events reinitializing\n" );
 
 			// Clearing the devices
-			libevdev_uinput_destroy(uidev);
+			libevdev_uinput_destroy( uidev );
 			libevdev_grab( dev , LIBEVDEV_UNGRAB );
-			libevdev_free(dev);
-			close(fd);
+			libevdev_free( dev );
+			close( fd );
 
 			// Reinitializing the devices
-			if ( InitializeDevices( argv , false ) ) return 1;
+			if ( InitializeDevices( arguments[ 0 ] , false ) ) return 1;
 
 			continue;
 
@@ -161,53 +251,49 @@ int main( int argc , char* argv[] ) {
 		// If event was a key event
 		if ( ev.type == EV_KEY ) {
 
-			switch (ev.value) {
+			switch ( ev.value ) {
+
+				// On key up
+				case 0:
+
+					// Write the event immediately if gamemode is on and the event is for the keys W A S D or the delaymode is off
+					if ( ( gamemode && ( ev.code == 17 || ev.code == 30 || ev.code == 31 || ev.code == 32 ) ) || ( !delaymode ) ) {
+						libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
+					}
+
+					// Save the event time as the last key up time
+					keys[ ev.code ].last_up_time = ev.time;
+
+					// Start a waiter for this event to either write it after making sure its not a chatter ( delaymode ) or merely just to identify chatters in the key down events 
+					keys[ ev.code ].waiter = thread( WaitForChatter , ev , chatter_threshold , ref( keys[ ev.code ].waiter_id ) , ref( keys[ ev.code ].chattered_waiter_id ) );
+					keys[ ev.code ].waiter.detach();
+
+					continue;
+
+				break;
 
 				// On key down
 				case 1:
 
-					// Block chatters
-					if ( GetElapsedTime( last_keyup_times[ev.code] , ev.time ) < chatter_threshold ) {
-
-						// Dont block chatters if its the first keypress for that key
-						if ( last_keyup_times[ev.code].tv_sec == 0 ) {
-							libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
-							continue;
-						}
-
-						// Dont block chatters for W A S D keys if gamemode is enabled 
-						if (gamemode) {
-							if ( ev.code == 17 || ev.code == 30 || ev.code == 31 || ev.code == 32 ) {
-								libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
-								continue;
-							}
-						}
-
-						printf( "Prevented %s from chattering" , libevdev_event_code_get_name( ev.type , ev.code ) );
-						printf( " , chattered after %dms.\n" , GetElapsedTime( last_keyup_times[ev.code] , ev.time ) );
-						keys_held[ev.code] = true;
+					// Write the event immediately and dont do anything else if gamemode is on and the event is for the keys W A S D 
+					if ( gamemode && ( ev.code == 17 || ev.code == 30 || ev.code == 31 || ev.code == 32 ) ) {
+						libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
 						continue;
 					}
 
-				break;
+					// Block the event if its key has a waiter
+					if ( keys[ ev.code ].waiter_id != thread::id() ) {
 
-				// On key hold
-				case 2:
+						// Tell the waiter that its delayed event is a chatter
+						keys[ ev.code ].chattered_waiter_id = keys[ ev.code ].waiter_id;
 
-					// If the key is held after a chatter make sure to initiate it first
-					if (keys_held[ev.code]) {
-						libevdev_uinput_write_event( uidev , ev.type , ev.code , 1 );
-						libevdev_uinput_write_event( uidev , EV_SYN , SYN_REPORT , 0 );
-						keys_held[ev.code] = false;
+						// Show logs
+						printf( "Prevented %s from chattering" , libevdev_event_code_get_name( ev.type , ev.code ) );
+						printf( " , chattered after %dms.\n" , GetElapsedTime( keys[ ev.code ].last_up_time , ev.time ) );
+
+						continue;
+
 					}
-
-				break;
-
-				// On key up
-				default:
-
-					keys_held[ev.code] = false;
-					last_keyup_times[ev.code] = ev.time;
 
 				break;
 
@@ -215,7 +301,7 @@ int main( int argc , char* argv[] ) {
 
 		}
 
-		// Write dev event to uidev
+		// Write not filtered dev event to uidev
 		libevdev_uinput_write_event( uidev , ev.type , ev.code , ev.value );
 
 	}
